@@ -61,7 +61,7 @@ void setDefault() {
 	config.length = sizeof(config);
 	config.roll_offset = 0.0;
 	config.kp = 7.5f;
-	config.ki = 6.0f;
+	config.ki = 16.0f;
 	config.kd = 2.0f;
 	config.pwm_min = 0.00f;
 	config.pwm_max = 0.72f;
@@ -81,7 +81,7 @@ CBus LEDs(LED1, LED2, LED3, LED4, END);
 #define GYROSCOPE_SENSITIVITY 		65.536
 #define M_PI 						3.14159265359f
 #define RAD_TO_DEG 					57.295779513082320876798154814105f
-#define	PID_SAMPLE_RATE				1		// 5ms#define DT							((float)PID_SAMPLE_RATE/1000.0)
+#define	PID_SAMPLE_RATE				2		// 2ms#define DT							((float)PID_SAMPLE_RATE/1000.0)
 
 class BalanceRobot: public CThread {
 public:
@@ -176,6 +176,10 @@ protected:
 		// loop
 		//
 		while (isAlive()) {
+
+			//
+			// wait timer interrupt (DT)
+			//
 			if (tm.wait()) {
 				//
 				// read sensors
