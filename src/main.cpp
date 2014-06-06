@@ -1,17 +1,17 @@
 /*
  ===============================================================================
  Name        : main.cpp
- Author      :
+ Author      : uCXpresso
  Version     : v1.0.0
- Date		 :
- Copyright   :
- Description :
+ Date		 : 2014/6/6
+ Copyright   : MIT
+ Description : A balance robot control by PID algorithm.
  ===============================================================================
  History
  ---------+---------+--------------------------------------------+-------------
  DATE     |	VERSION |	DESCRIPTIONS							 |	By
  ---------+---------+--------------------------------------------+-------------
-
+ 2014/6/6	v1.0.0	Initialize Version								Jason
  ===============================================================================
  */
 
@@ -76,21 +76,12 @@ CBus LEDs(LED1, LED2, LED3, LED4, END);
 //
 // TODO: insert other definitions and declarations here
 //
-//double Kp = 35.0f;		//proportional action
-//double Ki = 1.0f;		//integral action
-//double Kd = 2.5f;		//derivative action
-//#define MAX_PWM	0.65f
-//
-//double Kp = 7.5f;		//proportional action
-//double Ki = 12.5f;		//integral action
-//double Kd = 0.5f;		//derivative action
-//#define MAX_PWM	0.75f
 
 #define ACCELEROMETER_SENSITIVITY 	8192.0
 #define GYROSCOPE_SENSITIVITY 		65.536
 #define M_PI 						3.14159265359f
 #define RAD_TO_DEG 					57.295779513082320876798154814105f
-#define	PID_SAMPLE_RATE				2		// 5ms#define DT							((float)PID_SAMPLE_RATE/1000.0)
+#define	PID_SAMPLE_RATE				1		// 5ms#define DT							((float)PID_SAMPLE_RATE/1000.0)
 
 class BalanceRobot: public CThread {
 public:
@@ -424,18 +415,18 @@ int main(void) {
 	// specific I2C addresses may be passed as a parameter here
 	// AD0 low = 0x68 (default for InvenSense evaluation board)
 	// AD0 high = 0x69
-	MPU6050 accelgyro;
+	MPU6050 mpu;
 
 	// initialize device
-	accelgyro.initialize();
-	accelgyro.setRate(7);
-	accelgyro.setFullScaleGyroRange(MPU6050_GYRO_FS_250);
-	accelgyro.setFullScaleAccelRange(MPU6050_ACCEL_FS_2);
+	mpu.initialize();
+	mpu.setRate(7);
+	mpu.setFullScaleGyroRange(MPU6050_GYRO_FS_250);
+	mpu.setFullScaleAccelRange(MPU6050_ACCEL_FS_2);
 
 	//
 	// check device
 	//
-	if (accelgyro.testConnection()) {
+	if (mpu.testConnection()) {
 	}
 
 	//
@@ -449,11 +440,11 @@ int main(void) {
 	left.enable();
 	right.enable();
 
-	BalanceRobot robot(accelgyro, left, right);
+	BalanceRobot robot(mpu, left, right);
 	robot.start("Robot", 256, PRI_HIGH);
 
 #ifndef DEBUG
-	myMenu menu(accelgyro, robot);
+	myMenu menu(mpu, robot);
 	menu.start();
 #endif
 
