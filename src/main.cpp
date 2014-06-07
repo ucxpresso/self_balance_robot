@@ -50,6 +50,8 @@ struct _config_{
 	double kd;
 	float  pwm_min;
 	float  pwm_max;
+	float  left_power;
+	float  right_power;
 	float  pid_offset;
 
 }PACK_STRUCT;
@@ -62,9 +64,11 @@ void setDefault() {
 	config.roll_offset = 0.0;
 	config.kp = 7.5f;
 	config.ki = 16.0f;
-	config.kd = 2.0f;
+	config.kd = 2.5f;
 	config.pwm_min = 0.00f;
-	config.pwm_max = 0.72f;
+	config.pwm_max = 0.75f;
+	config.left_power = 1.0f;
+	config.right_power = 1.0f;
 	config.pid_offset = 1.0f;
 }
 
@@ -228,8 +232,8 @@ protected:
 					myPID.Compute();
 					m_output = 0;
 				}
-				m_left->dutyCycle(m_output);
-				m_right->dutyCycle(m_output);
+				m_left->dutyCycle(m_output * config.left_power);
+				m_right->dutyCycle(m_output * config.right_power);
 			}
 		}
 	}
@@ -280,7 +284,7 @@ protected:
 			m_con << "*     Welcome to Self-Balance Robot    *" << endl;
 			m_con << "*               ver 1.0.0              *" << endl;
 			m_con << "****************************************" << endl;
-			m_con << "[1] Gyroscope & Accelerometer calibration" << endl;
+			m_con << "[1] Calibrations" << endl;
 			m_con << "[2] PID Control tuning" << endl;
 			m_con << "[3] Save changed" << endl;
 			m_con << "[4] Load Default" << endl;
@@ -309,15 +313,25 @@ protected:
 		while( m_usb.isConnected() ) {
 			m_con.clear();
 			m_con << "****************************************" << endl;
-			m_con << "* Gyroscope & Accelerometer calibration*" << endl;
+			m_con << "*            Calibrations              *" << endl;
 			m_con << "****************************************" << endl;
 			m_con.printf("[1] Set roll offset (%0.4f)\n", config.roll_offset);
+			m_con.printf("[2] Set left motor power (%0.2f)\n", config.left_power);
+			m_con.printf("[3] Set right motor power (%0.2f)\n", config.right_power);
 			m_con << "[ESC] Return" << endl;
 
 			switch( m_con.getc() ) {
 			case '1':
 				m_con << "Input roll offset:" << flush;
 				config.roll_offset = m_usb.parseFloat(true);
+				break;
+			case '2':
+				m_con << "Input left power:" << flush;
+				config.left_power = m_usb.parseFloat(true);
+				break;
+			case '3':
+				m_con << "Input right power:" << flush;
+				config.right_power = m_usb.parseFloat(true);
 				break;
 			case 0x1B:
 				return;
@@ -478,4 +492,3 @@ extern "C" void sys_setup(void) {
 	pool_memadd(USB_MEM_BASE, USB_MEM_SIZE);
 #endif
 }
-
