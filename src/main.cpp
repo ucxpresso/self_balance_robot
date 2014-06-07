@@ -237,7 +237,7 @@ protected:
 					m_output = 0;
 				}
 
-				if ( abs(m_roll)<5.0 ) m_output *= 0.8;
+				if ( abs(m_roll)<3.0 ) m_output *= 0.8;	// reduce shake
 
 				m_left->dutyCycle(m_output * config.left_power);
 				m_right->dutyCycle(m_output * config.right_power);
@@ -259,7 +259,7 @@ public:
 	}
 
 	virtual bool start() {
-		return CThread::start("menu", 148);
+		return CThread::start("menu", 168);
 	}
 
 protected:
@@ -482,7 +482,7 @@ int main(void) {
 	right.enable();
 
 	BalanceRobot robot(mpu, left, right);
-	robot.start("Robot", 102, PRI_HIGH);
+	robot.start("Robot", 128, PRI_HIGH);
 
 #ifndef DEBUG
 	myMenu menu(mpu, robot);

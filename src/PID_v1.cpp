@@ -34,9 +34,7 @@ PID::PID(double* Input, double* Output, double* Setpoint,
     PID::SetControllerDirection(ControllerDirection);
     PID::SetTunings(Kp, Ki, Kd);
 
-#ifdef __arm__
-    lastTime.reset();
-#else
+#ifndef __arm__
     lastTime = GetTickCount()-SampleTime;
 #endif
 }
@@ -52,9 +50,7 @@ bool PID::Compute()
 {
    if(!inAuto) return false;
 
-#ifdef __arm__
-   lastTime.wait(SampleTime);
-#else
+#ifndef __arm__
    unsigned long now = millis();
    unsigned long timeChange = (now - lastTime);
 
@@ -79,14 +75,13 @@ bool PID::Compute()
       /*Remember some variables for next time*/
       lastInput = input;
 
-#ifdef __arm__
-      lastTime.reset();
-      return true;
-#else
+#ifndef __arm__
       lastTime = now;
 	  return true;
    }
    else return false;
+#else
+   return true;
 #endif
 }
 

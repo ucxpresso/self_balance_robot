@@ -72,9 +72,7 @@ class PID
     double *myOutput;             //   This creates a hard link between the variables and the 
     double *mySetpoint;           //   PID, freeing the user from having to constantly tell us
                                   //   what these values are.  with pointers we'll just know.
-#ifdef __arm__
-    CTimeout	lastTime;
-#else
+#ifndef __arm__
 	unsigned long lastTime;
 #endif
 
