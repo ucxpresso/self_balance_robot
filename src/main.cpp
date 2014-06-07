@@ -4,7 +4,8 @@
  Author      : uCXpresso
  Version     : v1.0.0
  Date		 : 2014/6/6
- Copyright   : MIT
+ Copyright   : www.ucxpresso.net
+ License	 : MIT
  Description : A balance robot control by PID algorithm.
  ===============================================================================
  History
