@@ -12,6 +12,7 @@
  DATE     |	VERSION |	DESCRIPTIONS							 |	By
  ---------+---------+--------------------------------------------+-------------
  2014/6/6	v1.0.0	Initialize Version								Jason
+ 2014/6/7	v1.0.1	Add Dashboard 									Jason
  ===============================================================================
  */
 
@@ -62,11 +63,11 @@ static CONFIG_T	config;
 void setDefault() {
 	config.length = sizeof(config);
 	config.roll_offset = 0.0;
-	config.kp = 7.5f;
-	config.ki = 16.0f;
+	config.kp = 45.0f;
+	config.ki = 1.5f;
 	config.kd = 2.5f;
 	config.pwm_min = 0.00f;
-	config.pwm_max = 0.75f;
+	config.pwm_max = 1.00f;
 	config.left_power = 1.0f;
 	config.right_power = 1.0f;
 	config.pid_offset = 1.0f;
@@ -122,6 +123,10 @@ public:
 		m_mxMPU.unlock();
 	}
 
+public:
+	double m_output;
+	double m_roll;
+	double m_pitch;
 
 protected:
 	PID myPID;
@@ -131,17 +136,16 @@ protected:
 
 	double m_setpoint;
 	double m_input;
-	double m_output;
 
 	CMutex	m_mxMPU;
 
 	void ComplementaryFilter(int16_t accData[3], int16_t gyrData[3],
-			float *pitch, float *roll) {
-		float pitchAcc, rollAcc;
+			double *pitch, double *roll) {
+		double pitchAcc, rollAcc;
 
 		// Integrate the gyroscope data -> int(angularSpeed) = angle
-		*pitch += ((float) gyrData[0] / GYROSCOPE_SENSITIVITY) * DT; // Angle around the X-axis
-		*roll -= ((float) gyrData[1] / GYROSCOPE_SENSITIVITY) * DT; // Angle around the Y-axis
+		*pitch += ((double) gyrData[0] / GYROSCOPE_SENSITIVITY) * DT; // Angle around the X-axis
+		*roll -= ((double) gyrData[1] / GYROSCOPE_SENSITIVITY) * DT; // Angle around the Y-axis
 
 		// Compensate for drift with accelerometer data if !bullshit
 		// Sensitivity = -2 to 2 G at 16Bit -> 2G = 32768 && 0.5G = 8192
@@ -149,12 +153,12 @@ protected:
 				+ abs(accData[2]);
 		if (forceMagnitudeApprox > 8192 && forceMagnitudeApprox < 32768) {
 			// Turning around the X axis results in a vector on the Y-axis
-			pitchAcc = atan2f((float) accData[1], (float) accData[2])
+			pitchAcc = atan2f((double) accData[1], (double) accData[2])
 					* 180/ M_PI;
 			*pitch = *pitch * 0.98 + pitchAcc * 0.02;
 
 			// Turning around the Y axis results in a vector on the X-axis
-			rollAcc = atan2f((float) accData[0], (float) accData[2])
+			rollAcc = atan2f((double) accData[0], (double) accData[2])
 					* 180/ M_PI;
 			*roll = *roll * 0.98 + rollAcc * 0.02;
 		}
@@ -172,9 +176,8 @@ protected:
 		myPID.SetOutputLimits(config.pwm_min, config.pwm_max);
 		myPID.SetSampleTime(PID_SAMPLE_RATE);
 
-		float roll, pitch;
-		roll = 0.0f;
-		pitch = 0.0f;
+		m_roll = 0.0f;
+		m_pitch = 0.0f;
 
 		//
 		// loop
@@ -196,29 +199,29 @@ protected:
 				//
 				// filter
 				//
-				ComplementaryFilter(accData, gyrData, &pitch, &roll);
+				ComplementaryFilter(accData, gyrData, &m_pitch, &m_roll);
 
-				roll -= config.roll_offset;
+				m_roll -= config.roll_offset;
 
 				//
 				// PID Control
 				//
-				if (roll < -(config.pid_offset) ) {
+				if (m_roll>-75.0f && m_roll < -(config.pid_offset) ) {
 					LEDs[1] = LED_ON;
 					LEDs[2] = LED_OFF;
 
-					m_input = roll;
+					m_input = m_roll;
 					myPID.SetControllerDirection(DIRECT);
 					myPID.Compute();
 
 					m_left->direct(DIR_FORWARD);
 					m_right->direct(DIR_FORWARD);
 
-				} else if ( roll> config.pid_offset) {
+				} else if ( m_roll<75.0f && m_roll> config.pid_offset) {
 					LEDs[1] = LED_OFF;
 					LEDs[2] = LED_ON;
 
-					m_input = roll;
+					m_input = m_roll;
 					myPID.SetControllerDirection(REVERSE);
 					myPID.Compute();
 
@@ -232,6 +235,9 @@ protected:
 					myPID.Compute();
 					m_output = 0;
 				}
+
+				if ( abs(m_roll)<5.0 ) m_output *= 0.8;
+
 				m_left->dutyCycle(m_output * config.left_power);
 				m_right->dutyCycle(m_output * config.right_power);
 			}
@@ -288,6 +294,7 @@ protected:
 			m_con << "[2] PID Control tuning" << endl;
 			m_con << "[3] Save changed" << endl;
 			m_con << "[4] Load Default" << endl;
+			m_con << "[5] Dashboard" << endl;
 			switch(m_con.getc()) {
 			case '1' :
 				show_mpu6050();
@@ -300,6 +307,9 @@ protected:
 				break;
 			case '4' :
 				setDefault();
+				break;
+			case '5':
+				dashboard();
 				break;
 			case 'H':
 				m_con.printf("High-Water Mark:%d\n", getStackHighWaterMark());
@@ -385,6 +395,18 @@ protected:
 			case 0x1B:
 				return;
 			}
+		}
+	}
+
+	void dashboard() {
+		while(m_usb.isConnected() ) {
+			m_con.clear();
+			m_con << "Patch   Roll    PWM" << endl;
+			m_con.printf("%0.3f\t%0.3f\t%0.3f", m_robot->m_pitch, m_robot->m_roll, m_robot->m_output);
+			if ( m_usb.available() ) {
+				if ( m_con.getc()==0x1B ) return;
+			}
+			sleep(250);
 		}
 	}
 
