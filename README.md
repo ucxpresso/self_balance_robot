@@ -1,4 +1,4 @@
-self_balance_robot
+self balance robot
 ==================
 
 A balance robot control by PID algorithm.
