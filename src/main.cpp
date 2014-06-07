@@ -252,7 +252,7 @@ public:
 	}
 
 	virtual bool start() {
-		return CThread::start("menu", 256);
+		return CThread::start("menu", 148);
 	}
 
 protected:
@@ -459,7 +459,7 @@ int main(void) {
 	right.enable();
 
 	BalanceRobot robot(mpu, left, right);
-	robot.start("Robot", 256, PRI_HIGH);
+	robot.start("Robot", 102, PRI_HIGH);
 
 #ifndef DEBUG
 	myMenu menu(mpu, robot);
