@@ -2,8 +2,8 @@
  ===============================================================================
  Name        : main.cpp
  Author      : uCXpresso
- Version     : v1.0.0
- Date		 : 2014/6/6
+ Version     : v1.0.2
+ Date		 : 2014/6/14
  Copyright   : www.ucxpresso.net
  License	 : MIT
  Description : A balance robot control by PID algorithm.
@@ -14,6 +14,7 @@
  ---------+---------+--------------------------------------------+-------------
  2014/6/6	v1.0.0	Initialize Version								Jason
  2014/6/7	v1.0.1	Add Dashboard 									Jason
+ 2014/6/14	v1.0.2	Update PID setting								Jason
  ===============================================================================
  */
 
@@ -54,7 +55,7 @@ struct _config_{
 	float  pwm_max;
 	float  left_power;
 	float  right_power;
-	float  pid_offset;
+	float  skip_interval;
 
 }PACK_STRUCT;
 typedef struct _config_ CONFIG_T;
@@ -64,15 +65,19 @@ static CONFIG_T	config;
 void setDefault() {
 	config.length = sizeof(config);
 	config.roll_offset = 0.0;
-	config.kp = 45.0f;
-	config.ki = 1.5f;
-	config.kd = 2.5f;
+	config.kp = 35.0f;
+	config.ki = 16.0f;
+	config.kd = 0.4f;
 	config.pwm_min = 0.00f;
 	config.pwm_max = 1.00f;
 	config.left_power = 1.0f;
 	config.right_power = 1.0f;
-	config.pid_offset = 1.0f;
+	config.skip_interval = 1.0f;
 }
+
+const double consKp = 25;
+const double consKi = 0.5;
+const double consKd = 1.0;
 
 //
 //
@@ -109,10 +114,6 @@ public:
 
 	void tuings(double kp, double ki, double kd) {
 		myPID.SetTunings(kp, ki, kd);
-	}
-
-	void setOutputLimits(float min, float max) {
-		myPID.SetOutputLimits(min, max);
 	}
 
 	void setAccGryOffset(int16_t ax, int16_t ay, int16_t az, int16_t gx, int16_t gy) {
@@ -174,11 +175,13 @@ protected:
 		tm.enable();
 
 		myPID.SetMode(AUTOMATIC);
-		myPID.SetOutputLimits(config.pwm_min, config.pwm_max);
+		myPID.SetOutputLimits(-100.0, 100.0);
 		myPID.SetSampleTime(PID_SAMPLE_RATE);
 
 		m_roll = 0.0f;
 		m_pitch = 0.0f;
+
+		double output;
 
 		//
 		// loop
@@ -202,45 +205,55 @@ protected:
 				//
 				ComplementaryFilter(accData, gyrData, &m_pitch, &m_roll);
 
-				m_roll -= config.roll_offset;
+				//
+				// auto tuning
+				//
+//				if ( abs(m_roll)<10 ) {
+//					myPID.SetTunings(consKp, consKi, consKd);
+//				} else {
+//					myPID.SetTunings(config.kp, config.ki, config.kd);
+//				}
 
-				//
-				// PID Control
-				//
-				if (m_roll>-75.0f && m_roll < -(config.pid_offset) ) {
+				m_input = m_roll;
+				m_setpoint = config.roll_offset;
+				myPID.Compute();
+
+				if ( m_output > config.skip_interval ) {
 					LEDs[1] = LED_ON;
 					LEDs[2] = LED_OFF;
-
-					m_input = m_roll;
-					myPID.SetControllerDirection(DIRECT);
-					myPID.Compute();
+					output = map(m_output, config.skip_interval, 100, config.pwm_min, config.pwm_max);
 
 					m_left->direct(DIR_FORWARD);
 					m_right->direct(DIR_FORWARD);
 
-				} else if ( m_roll<75.0f && m_roll> config.pid_offset) {
+				} else if ( m_output<-config.skip_interval ) {
 					LEDs[1] = LED_OFF;
 					LEDs[2] = LED_ON;
-
-					m_input = m_roll;
-					myPID.SetControllerDirection(REVERSE);
-					myPID.Compute();
+					output = map(m_output, -config.skip_interval, -100, config.pwm_min, config.pwm_max);
 
 					m_left->direct(DIR_REVERSE);
 					m_right->direct(DIR_REVERSE);
-
 				} else {
 					LEDs[1] = LED_OFF;
 					LEDs[2] = LED_OFF;
-					m_input = 0;
-					myPID.Compute();
-					m_output = 0;
+					output = 0;
+					m_left->direct(DIR_STOP);
+					m_right->direct(DIR_STOP);
 				}
 
-				if ( abs(m_roll)<3.0 ) m_output *= 0.8;	// reduce shake
+				//
+				// auto power off when fell.
+				//
+				if ( abs(m_roll)>65 ) {
+					output = 0;
+				}
 
-				m_left->dutyCycle(m_output * config.left_power);
-				m_right->dutyCycle(m_output * config.right_power);
+				//
+				// output
+				//
+				m_left->dutyCycle(output * config.left_power);
+				m_right->dutyCycle(output * config.right_power);
+
 			}
 		}
 	}
@@ -361,7 +374,7 @@ protected:
 			m_con.printf("[3] Kd (%0.3f)\n", config.kd);
 			m_con.printf("[4] Min. PWM (%0.2f)\n", config.pwm_min);
 			m_con.printf("[5] Max. PWM (%0.2f)\n", config.pwm_max);
-			m_con.printf("[6] Filter Offset (%0.4f)\n", config.pid_offset);
+			m_con.printf("[6] Skip Interval (%0.4f)\n", config.skip_interval);
 			m_con << "[ESC] Return" << endl;
 			switch(m_con.getc()) {
 			case '1':
@@ -382,16 +395,14 @@ protected:
 			case '4':
 				m_con << "Input Min. PWM:" << flush;
 				config.pwm_min = m_usb.parseFloat(true);
-				m_robot->setOutputLimits(config.pwm_min, config.pwm_max);
 				break;
 			case '5':
 				m_con << "Input Max. PWM:" << flush;
 				config.pwm_max = m_usb.parseFloat(true);
-				m_robot->setOutputLimits(config.pwm_min, config.pwm_max);
 				break;
 			case '6':
-				m_con << "Input Pid Offset:" << flush;
-				config.pid_offset = m_usb.parseFloat(true);
+				m_con << "Input Skip Interval:" << flush;
+				config.skip_interval = m_usb.parseFloat(true);
 				break;
 			case 0x1B:
 				return;
@@ -402,7 +413,7 @@ protected:
 	void dashboard() {
 		while(m_usb.isConnected() ) {
 			m_con.clear();
-			m_con << "Patch   Roll    PWM" << endl;
+			m_con << "Patch   Roll    PWM\%" << endl;
 			m_con.printf("%0.3f\t%0.3f\t%0.3f", m_robot->m_pitch, m_robot->m_roll, m_robot->m_output);
 			if ( m_usb.available() ) {
 				if ( m_con.getc()==0x1B ) return;
@@ -482,7 +493,7 @@ int main(void) {
 	right.enable();
 
 	BalanceRobot robot(mpu, left, right);
-	robot.start("Robot", 128, PRI_HIGH);
+	robot.start("Robot", 136, PRI_HIGH);
 
 #ifndef DEBUG
 	myMenu menu(mpu, robot);
