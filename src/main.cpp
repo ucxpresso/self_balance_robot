@@ -17,6 +17,7 @@
  2014/6/14	v1.0.2	Update PID setting								Jason
  ===============================================================================
  */
+#define VERSION	"v1.0.2"
 
 #include "uCXpresso.h"
 #include "class/serial.h"
@@ -65,14 +66,14 @@ static CONFIG_T	config;
 void setDefault() {
 	config.length = sizeof(config);
 	config.roll_offset = 0.0;
-	config.kp = 20.0f;
+	config.kp = 18.0f;
 	config.ki = 16.0f;
-	config.kd = 0.4f;
-	config.pwm_min = 0.00f;
+	config.kd = 0.08f;
+	config.pwm_min = 0.20f;
 	config.pwm_max = 1.00f;
 	config.left_power = 1.0f;
 	config.right_power = 1.0f;
-	config.skip_interval = 1.0f;
+	config.skip_interval = 0.0f;
 }
 
 const double consKp = 25;
@@ -303,7 +304,7 @@ protected:
 			m_con.clear();
 			m_con << "****************************************" << endl;
 			m_con << "*     Welcome to Self-Balance Robot    *" << endl;
-			m_con << "*               ver 1.0.0              *" << endl;
+			m_con << "*                 " VERSION "               *" << endl;
 			m_con << "****************************************" << endl;
 			m_con << "[1] Calibrations" << endl;
 			m_con << "[2] PID Control tuning" << endl;
