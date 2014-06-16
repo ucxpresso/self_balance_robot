@@ -2,8 +2,8 @@
  ===============================================================================
  Name        : main.cpp
  Author      : uCXpresso
- Version     : v1.0.2
- Date		 : 2014/6/14
+ Version     : v1.1.0
+ Date		 : 2014/6/16
  Copyright   : www.ucxpresso.net
  License	 : MIT
  Description : A balance robot control by PID algorithm.
@@ -15,9 +15,11 @@
  2014/6/6	v1.0.0	Initialize Version								Jason
  2014/6/7	v1.0.1	Add Dashboard 									Jason
  2014/6/14	v1.0.2	Update PID setting								Jason
+ 2014/6/16	v1.1.0	Auto tuning										Jason
  ===============================================================================
  */
-#define VERSION	"v1.0.2"
+#define VERSION	"v1.1.0"
+#define USE_AUTO_TUNING	1
 
 #include "uCXpresso.h"
 #include "class/serial.h"
@@ -65,15 +67,19 @@ static CONFIG_T	config;
 
 void setDefault() {
 	config.length = sizeof(config);
+#if USE_AUTO_TUNING
+	config.roll_offset = 2.0;	// auto tune range for output angle
+#else
 	config.roll_offset = 0.0;
-	config.kp = 18.0f;
-	config.ki = 16.0f;
+#endif
+	config.kp = 20.0f;
+	config.ki = 15.0f;
 	config.kd = 0.08f;
-	config.pwm_min = 0.20f;
+	config.pwm_min = 0.00f;
 	config.pwm_max = 1.00f;
 	config.left_power = 1.0f;
 	config.right_power = 1.0f;
-	config.skip_interval = 0.0f;
+	config.skip_interval = 2.0f;
 }
 
 const double consKp = 25;
@@ -93,7 +99,7 @@ CBus LEDs(LED1, LED2, LED3, LED4, END);
 #define GYROSCOPE_SENSITIVITY 		65.536
 #define M_PI 						3.14159265359f
 #define RAD_TO_DEG 					57.295779513082320876798154814105f
-#define	PID_SAMPLE_RATE				10		// 10ms#define DT							((float)PID_SAMPLE_RATE/1000.0)
+#define	PID_SAMPLE_RATE				10		// millisecond#define DT							((float)PID_SAMPLE_RATE/1000.0)
 
 class BalanceRobot: public CThread {
 public:
@@ -130,6 +136,8 @@ public:
 	double m_output;
 	double m_roll;
 	double m_pitch;
+	double m_setpoint;
+	double m_input;
 
 protected:
 	PID myPID;
@@ -137,8 +145,6 @@ protected:
 	HBridge *m_left;
 	HBridge *m_right;
 
-	double m_setpoint;
-	double m_input;
 
 	CMutex	m_mxMPU;
 
@@ -184,6 +190,16 @@ protected:
 
 		double output;
 
+#if USE_AUTO_TUNING
+		double sp_input, sp_output, sp_setpoint, lastRoll;
+		PID speedPID(&sp_input, &sp_output, &sp_setpoint, 40.0, 1.0, 2.5, DIRECT);
+		speedPID.SetMode(AUTOMATIC);
+		speedPID.SetOutputLimits(-config.roll_offset, config.roll_offset);
+		speedPID.SetSampleTime(PID_SAMPLE_RATE);
+		sp_input = 0;
+		sp_setpoint = 0;
+		lastRoll = 0;
+#endif
 		//
 		// loop
 		//
@@ -206,17 +222,15 @@ protected:
 				//
 				ComplementaryFilter(accData, gyrData, &m_pitch, &m_roll);
 
+
+#if USE_AUTO_TUNING
+				sp_input = (lastRoll - m_roll) / PID_SAMPLE_RATE;	// roll speed
+				lastRoll = m_roll;
+				speedPID.Compute();
+				m_setpoint = -sp_output;							// tune output angle
+#else
 				m_roll -= config.roll_offset;
-
-				//
-				// auto tuning
-				//
-//				if ( abs(m_roll)<10 ) {
-//					myPID.SetTunings(consKp, consKi, consKd);
-//				} else {
-//					myPID.SetTunings(config.kp, config.ki, config.kd);
-//				}
-
+#endif
 				m_input = m_roll;
 				myPID.Compute();
 
@@ -295,7 +309,7 @@ protected:
 				show_welcome();
 			}
 			LEDs[3] = !LEDs[3];
-			sleep(200);
+			sleep(500);
 		}
 	}
 
@@ -341,14 +355,22 @@ protected:
 			m_con << "****************************************" << endl;
 			m_con << "*            Calibrations              *" << endl;
 			m_con << "****************************************" << endl;
+#if USE_AUTO_TUNING
+			m_con.printf("[1] Set roll angle (%0.4f)\n", config.roll_offset);
+#else
 			m_con.printf("[1] Set roll offset (%0.4f)\n", config.roll_offset);
+#endif
 			m_con.printf("[2] Set left motor power (%0.2f)\n", config.left_power);
 			m_con.printf("[3] Set right motor power (%0.2f)\n", config.right_power);
 			m_con << "[ESC] Return" << endl;
 
 			switch( m_con.getc() ) {
 			case '1':
+#if USE_AUTO_TUNING
+				m_con << "Input roll angle:" << flush;
+#else
 				m_con << "Input roll offset:" << flush;
+#endif
 				config.roll_offset = m_usb.parseFloat(true);
 				break;
 			case '2':
@@ -415,8 +437,8 @@ protected:
 	void dashboard() {
 		while(m_usb.isConnected() ) {
 			m_con.clear();
-			m_con << "Patch   Roll    PWM\%" << endl;
-			m_con.printf("%0.3f\t%0.3f\t%0.3f", m_robot->m_pitch, m_robot->m_roll, m_robot->m_output);
+			m_con << "SetPoint Patch   Roll    PWM\%" << endl;
+			m_con.printf("%0.3f\t %0.3f\t %0.3f\t%0.3f", m_robot->m_setpoint, m_robot->m_pitch, m_robot->m_roll, m_robot->m_output);
 			if ( m_usb.available() ) {
 				if ( m_con.getc()==0x1B ) return;
 			}
@@ -495,12 +517,13 @@ int main(void) {
 	right.enable();
 
 	BalanceRobot robot(mpu, left, right);
-	robot.start("Robot", 136, PRI_HIGH);
+	robot.start("Robot", 168, PRI_HIGH);
 
 #ifndef DEBUG
 	myMenu menu(mpu, robot);
 	menu.start();
 #endif
+
 
 	while (1) {
 		/**********************************************************************
@@ -508,8 +531,9 @@ int main(void) {
 		 *                         your loop code here
 		 *
 		 **********************************************************************/
+
 		LEDs[0] = !LEDs[0];
-		sleep(200);
+		sleep(500);
 	}
 	return 0;
 }
