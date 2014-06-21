@@ -72,9 +72,9 @@ void setDefault() {
 #else
 	config.roll_offset = 0.0;
 #endif
-	config.kp = 20.0f;
-	config.ki = 15.0f;
-	config.kd = 0.08f;
+	config.kp = 25.0f;
+	config.ki = 7.5f;
+	config.kd = 0.1f;
 	config.pwm_min = 0.00f;
 	config.pwm_max = 1.00f;
 	config.left_power = 1.0f;
@@ -192,7 +192,7 @@ protected:
 
 #if USE_AUTO_TUNING
 		double sp_input, sp_output, sp_setpoint, lastRoll;
-		PID speedPID(&sp_input, &sp_output, &sp_setpoint, 40.0, 1.0, 2.5, DIRECT);
+		PID speedPID(&sp_input, &sp_output, &sp_setpoint, 35, 1, 2, DIRECT);
 		speedPID.SetMode(AUTOMATIC);
 		speedPID.SetOutputLimits(-config.roll_offset, config.roll_offset);
 		speedPID.SetSampleTime(PID_SAMPLE_RATE);
