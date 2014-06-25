@@ -72,8 +72,8 @@ void setDefault() {
 #else
 	config.roll_offset = 0.0;
 #endif
-	config.kp = 25.0f;
-	config.ki = 7.5f;
+	config.kp = 20.0f;
+	config.ki = 15.0f;
 	config.kd = 0.1f;
 	config.pwm_min = 0.00f;
 	config.pwm_max = 1.00f;
