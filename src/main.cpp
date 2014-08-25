@@ -99,7 +99,7 @@ CBus LEDs(LED1, LED2, LED3, LED4, END);
 #define GYROSCOPE_SENSITIVITY 		65.536
 #define M_PI 						3.14159265359f
 #define RAD_TO_DEG 					57.295779513082320876798154814105f
-#define	PID_SAMPLE_RATE				10		// millisecond#define DT							((float)PID_SAMPLE_RATE/1000.0)
+#define	PID_SAMPLE_RATE				3		// millisecond#define DT							((float)PID_SAMPLE_RATE/1000.0)
 
 class BalanceRobot: public CThread {
 public:
